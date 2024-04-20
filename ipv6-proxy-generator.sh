@@ -126,4 +126,37 @@ function create_startup_script(){
   # Temporary variable to count generated ip's in cycle
   count=1
 
-  # Generate
+  # Generate random ips and add them to main interface
+  while [ \$count -le $proxy_count ]; do
+    ipv6_addr=\$(rnd_subnet_ip)
+    ip -6 addr add \$ipv6_addr/$subnet dev $interface_name
+    echo \$ipv6_addr >> $random_ipv6_list_file
+    let "count += 1";
+  done;
+
+  # Generate random usernames and passwords if they are enabled
+  if [ "$use_random_auth" = true ]; then
+    user="\$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '')"
+    password="\$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '')"
+  fi
+
+  # Set 3proxy configuration
+  cat > $3proxy_config_path <<-EOF3PROXYCFG
+daemon
+nserver 8.8.8.8
+nserver 8.8.4.4
+nscache 65536
+timeouts 1 5 30 60 180 1800 15 60
+users ${user}:CL:${password}
+auth strong
+${proxies_type} -i${proxy_start_port} -n
+EOF3PROXYCFG
+
+  # Run 3proxy daemon
+  /usr/bin/3proxy $3proxy_config_path
+EOF
+
+  chmod +x $startup_script_path
+}
+
+...
